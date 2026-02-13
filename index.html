@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Racing AI Dashboard</title>
+<style>
+body { font-family: Arial,sans-serif; background:#f0f0f0; margin:0; padding:0; }
+header { background:#222; color:white; text-align:center; padding:1rem; }
+main { padding:1rem; }
+input[type=text] { width:250px; padding:0.5rem; margin-right:0.5rem; }
+button { padding:0.5rem 1rem; cursor:pointer; }
+.racecard { background:white; margin:1rem 0; padding:1rem; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.2); cursor:move;}
+.race-title { font-weight:bold; margin-bottom:0.5rem; }
+.horse-widget { display:flex; justify-content:space-between; margin:0.25rem 0; padding:0.25rem 0.5rem; border-bottom:1px solid #eee; }
+.prob-bar { height:12px; background:#007bff; border-radius:5px; }
+.slider { width:100px; }
+</style>
+</head>
+<body>
+<header><h1>Riyadh Racing AI Dashboard</h1></header>
+<main>
+<div>
+    <input type="text" id="racecourseInput" placeholder="Enter Racecourse Name (e.g. Riyadh)">
+    <button onclick="loadRacecourse()">Load Races</button>
+</div>
+<div id="raceContainer"></div>
+</main>
+
+<script>
+// --- Drag-and-drop support
+function enableDragDrop() {
+    const cards = document.querySelectorAll('.racecard');
+    cards.forEach(card => {
+        card.draggable = true;
+        card.ondragstart = e => { e.dataTransfer.setData('text/plain', e.target.id); };
+        card.ondragover = e => e.preventDefault();
+        card.ondrop = e => {
+            const draggedId = e.dataTransfer.getData('text/plain');
+            const draggedEl = document.getElementById(draggedId);
+            const dropTarget = e.target.closest('.racecard');
+            if(draggedEl && dropTarget && draggedEl !== dropTarget) {
+                dropTarget.parentNode.insertBefore(draggedEl, dropTarget.nextSibling);
+            }
+        };
+    });
+}
+
+// --- Load Racecourse
+async function loadRacecourse() {
+    const racecourse = document.getElementById('racecourseInput').value;
+    const container = document.getElementById('raceContainer');
+    container.innerHTML = '<p>Loading...</p>';
+
+    try {
+        const res = await fetch(`http://127.0.0.1:8000/racecourse/${encodeURIComponent(racecourse)}`);
+        const data = await res.json();
+        container.innerHTML = '';
+
+        data.races.forEach((race,i) => {
+            const raceDiv = document.createElement('div');
+            raceDiv.className = 'racecard';
+            raceDiv.id = 'racecard'+i;
+            raceDiv.innerHTML = `<div class="race-title">Race ${race.race_number} - ${race.distance_m}m - ${race.class}</div>`;
+            
+            race.horses.forEach(horse => {
+                const hw = document.createElement('div');
+                hw.className = 'horse-widget';
+                hw.innerHTML = `
+                    <div>${horse.name} (${horse.jockey} / ${horse.trainer})</div>
+                    <div style="width:200px;">
+                        <div class="prob-bar" style="width:${horse.win_prob*100}%"></div>
+                        <small>${(horse.win_prob*100).toFixed(1)}%</small>
+                        <input type="range" min="0" max="1" step="0.01" value="${horse.stake_fraction}" class="slider">
+                    </div>
+                `;
+                raceDiv.appendChild(hw);
+            });
+            container.appendChild(raceDiv);
+        });
+
+        enableDragDrop();
+    } catch(err) {
+        console.error(err);
+        container.innerHTML = '<p style="color:red;">Failed to load races. Make sure backend is running.</p>';
+    }
+}
+</script>
+</body>
+</html>
